@@ -1,0 +1,27 @@
+[project]
+name = "stockplatform"
+version = "0.1.0"
+description = "Shared library for the Stock Analytics Platform: events, registry client, service factory, database helpers"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "pika>=1.3",
+    "redis>=5.0",
+    "psycopg[binary]>=3.1",
+    "psycopg_pool>=3.2",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "fakeredis"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["stockplatform*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
