@@ -19,6 +19,7 @@ from fastapi.responses import HTMLResponse
 
 from .config import env, env_list
 from . import metrics as metrics_module
+from . import ui_kit
 from .events import Broker, Handler, make_broker
 from .registry_client import RegistryClient
 
@@ -26,36 +27,23 @@ log = logging.getLogger("service")
 
 INSTANCE_ID = os.environ.get("INSTANCE_ID") or f"{socket.gethostname()}-{uuid.uuid4().hex[:6]}"
 
-PAGE_STYLE = """
-body{font-family:system-ui,sans-serif;margin:0;background:#f5f6f8;color:#1b1f24}
-header{background:#4f2683;color:#fff;padding:14px 24px}
-header a{color:#fff;text-decoration:none;font-weight:600}
-main{max-width:980px;margin:24px auto;padding:0 16px}
-.card{background:#fff;border-radius:8px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 3px #0002}
-label{display:block;margin:8px 0 2px;font-size:14px}
-input,select,button{font:inherit;padding:6px 10px;border:1px solid #bbb;border-radius:6px}
-button{background:#4f2683;color:#fff;border:0;cursor:pointer}
-table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #e3e3e3}
-.muted{color:#666;font-size:13px}.err{color:#b00020}
-pre{background:#f0f0f4;padding:10px;border-radius:6px;overflow:auto}
-"""
-
-
 def code_engine_url() -> str:
     """On IBM Cloud Code Engine every app gets CE_APP and CE_DOMAIN, which give its public address."""
     app, domain = env("CE_APP"), env("CE_DOMAIN")
     return f"https://{app}.{domain}" if app and domain else ""
 
 
-def render_page(title: str, body: str, script: str = "") -> HTMLResponse:
-    """Wrap a tool's body HTML in the shared page layout."""
+def render_page(title: str, body: str, script: str = "", subtitle: str = "") -> HTMLResponse:
+    """Wrap a tool's body HTML in the shared page layout, styles and chart helpers."""
     t = html.escape(title)
+    sub = f"<p>{html.escape(subtitle)}</p>" if subtitle else "<p>Stock Analytics Platform</p>"
     return HTMLResponse(
         f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' "
-        f"content='width=device-width,initial-scale=1'><title>{t}</title><style>{PAGE_STYLE}</style></head>"
-        f"<body><header><a href='/'>{t}</a></header><main>{body}"
-        f"<p class='muted'>Served by instance {html.escape(INSTANCE_ID)}</p></main>"
-        f"<script>{script}</script></body></html>")
+        f"content='width=device-width,initial-scale=1'><title>{t}</title><style>{ui_kit.CSS}</style></head>"
+        f"<body><header><div class='row'><div class='logo'>{ui_kit.LOGO}</div><div><h1>{t}</h1>{sub}</div>"
+        f"<a id='back' href='/'>&larr; All tools</a></div></header><main>{body}</main>"
+        f"<footer>Served by instance <b>{html.escape(INSTANCE_ID)}</b></footer>"
+        f"<script>{ui_kit.JS}</script><script>{script}</script></body></html>")
 
 
 def create_service(name: str, title: str, description: str, tags: list[str] | None = None,
