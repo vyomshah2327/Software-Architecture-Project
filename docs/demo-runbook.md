@@ -20,8 +20,8 @@ About 12 minutes of live demo. Rehearse it twice, once locally and once on the c
 **3. One address, many copies.** Open `/health` of any service twice and show `instance`. Explain that the registry holds one address per service and Code Engine spreads requests over the copies.
 
 **4. Registry failover.** In the UI keep typing searches. Stop the primary registry:
-`ibmcloud ce app update --name registry-primary --min-scale 0 --max-scale 0`
-The amber banner appears within a couple of seconds, search keeps working. Start it again with `--min-scale 1 --max-scale 2`; the banner goes away.
+`ibmcloud ce app delete --name registry-primary --force`
+The amber banner appears within a couple of seconds, search keeps working. Bring it back with `terraform -chdir=infra/terraform apply -auto-approve` (about a minute, it recreates the missing app); the banner goes away.
 Fallback: `docker compose stop registry-primary`, or `scripts/demo_failover.sh` locally.
 
 **5. Events, end to end.** In Portfolio add AAPL to the watchlist. In Alerts create a rule `AAPL above 1`, which is already true. Run the ingestor:

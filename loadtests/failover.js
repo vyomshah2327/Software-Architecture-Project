@@ -1,7 +1,7 @@
 // k6: steady searches while the primary registry is stopped. Searches must keep succeeding.
 //   k6 run -e UI_URL=https://ui.xxx... loadtests/failover.js
 // While it runs (90 seconds), stop the primary registry:
-//   Code Engine:  ibmcloud ce app update --name registry-primary --min-scale 0 --max-scale 0   (undo with 1 and 2)
+//   Code Engine:  ibmcloud ce app delete --name registry-primary --force   (undo: terraform apply recreates it)
 //   Compose:      docker compose stop registry-primary
 //   Local:        scripts/demo_failover.sh
 // Target: no failed searches, and every search under 10 s (the plan is about 2 s).
