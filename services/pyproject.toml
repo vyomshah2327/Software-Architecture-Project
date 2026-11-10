@@ -1,0 +1,12 @@
+[project]
+name = "stock-services"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["stockplatform", "fastapi", "uvicorn"]
+
+[tool.setuptools.packages.find]
+include = ["price_history*", "performance*", "volatility_risk*", "indicators*", "fund_builder*",
+           "portfolio*", "correlation_svc*", "alerts_monitor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
