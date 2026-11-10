@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars. Put the API key in TF_VAR_ibmcloud_api_key instead of this file.
+region         = "ca-tor"
+resource_group = "default"
+name_prefix    = "stock"
+
+image_prefix = "ghcr.io/vyomshah2327"
+image_tag    = "latest"
+
+# Autoscaling. Set max_instances = 1 to run the "without scaling" load test.
+min_instances      = 1
+max_instances      = 5
+target_concurrency = 10
+
+data_mode   = "managed"
+data_source = "fake"
