@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stock Analytics Platform</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;background:#f5f6f8;color:#1b1f24}
+  header{background:#4f2683;color:#fff;padding:16px 24px}
+  header h1{margin:0;font-size:20px}
+  #banner{display:none;background:#f5a623;color:#3b2a00;padding:10px 24px;font-weight:600}
+  #banner.down{background:#b00020;color:#fff}
+  main{max-width:960px;margin:24px auto;padding:0 16px}
+  form{display:flex;gap:8px;margin-bottom:16px}
+  input{flex:1;font:inherit;padding:10px 12px;border:1px solid #bbb;border-radius:6px}
+  button{font:inherit;padding:10px 18px;border:0;border-radius:6px;background:#4f2683;color:#fff;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px #0002}
+  .card h3{margin:0 0 6px}.card a{color:#4f2683;font-weight:600}
+  .tag{display:inline-block;background:#ece6f4;color:#4f2683;border-radius:10px;padding:1px 8px;margin:4px 4px 0 0;font-size:12px}
+  .muted{color:#666}
+  #toast{position:fixed;right:16px;bottom:16px;max-width:320px}
+  .toast{background:#1b1f24;color:#fff;padding:12px 14px;border-radius:8px;margin-top:8px}
+  .badge{font-size:12px;margin-left:12px;opacity:.85}
+</style>
+</head>
+<body>
+<header><h1>Stock Analytics Platform <span class="badge" id="role"></span></h1></header>
+<div id="banner" role="status"></div>
+<main>
+  <form id="f"><input id="q" placeholder="Search tools, for example risk, correlation or portfolio" autofocus><button>Search</button></form>
+  <p class="muted" id="count"></p>
+  <div class="grid" id="results"></div>
+</main>
+<div id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);
+function show(services){
+  $('count').textContent=services.length?`${services.length} tool${services.length>1?'s':''} available`:'No tools match your search.';
+  $('results').innerHTML=services.map(s=>`<div class="card"><h3><a href="${s.url}" target="_blank" rel="noopener">${esc(s.name)}</a></h3>
+    <div class="muted">${esc(s.description)}</div>${(s.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`).join('');
+}
+function esc(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function banner(role){
+  const b=$('banner'); b.className=role==='down'?'down':'';
+  if(role==='primary'){b.style.display='none';$('role').textContent='registry: primary';return}
+  b.style.display='block';
+  b.textContent=role==='backup'?'Running on the backup registry. Everything still works.':'The service registry is not reachable. Search is paused.';
+  $('role').textContent='registry: '+role;
+}
+async function search(){
+  const q=$('q').value;
+  try{const r=await fetch('/api/search?q='+encodeURIComponent(q));const j=await r.json();
+    if(!r.ok){banner('down');$('count').textContent=j.error;$('results').innerHTML='';return}
+    banner(j.role);show(j.services)}
+  catch(e){banner('down')}
+}
+$('f').addEventListener('submit',e=>{e.preventDefault();search()});
+const es=new EventSource('/api/events');
+es.addEventListener('registry',e=>banner(JSON.parse(e.data).role));
+es.addEventListener('services',()=>search());
+es.addEventListener('alert',e=>{const a=JSON.parse(e.data);const t=document.createElement('div');t.className='toast';
+  t.textContent=`Alert: ${a.symbol} is ${a.direction} ${a.threshold} (now ${a.price})`;$('toast').appendChild(t);setTimeout(()=>t.remove(),15000)});
+search();
+</script>
+</body>
+</html>
