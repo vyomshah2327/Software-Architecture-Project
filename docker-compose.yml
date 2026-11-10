@@ -1,0 +1,121 @@
+# Whole platform on one machine:  docker compose up --build
+# UI http://localhost:8080   registry http://localhost:8000 (backup 8001)   RabbitMQ http://localhost:15672
+# Services on 8101 to 8108. Containers reach each other by name; the browser uses the localhost ports,
+# so each service registers its localhost address and gives the registry its container name for health checks.
+x-env: &env
+  DATABASE_URL: postgresql://stock:stock@postgres:5432/stock
+  REDIS_URL: redis://redis:6379/0
+  AMQP_URL: amqp://guest:guest@rabbitmq:5672/
+  REGISTRY_URLS: http://registry-primary:8000,http://registry-backup:8000
+  REGISTRY_KEY: ${REGISTRY_KEY:-change-me}
+
+x-service: &service
+  build: { context: ., dockerfile: services/Dockerfile }
+  depends_on: { init: { condition: service_completed_successfully }, registry-primary: { condition: service_started }, rabbitmq: { condition: service_healthy } }
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: stock, POSTGRES_PASSWORD: stock, POSTGRES_DB: stock }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U stock"], interval: 3s, retries: 20 }
+
+  redis:
+    image: redis:7
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 3s, retries: 20 }
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports: ["15672:15672"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 5s, retries: 20 }
+
+  init:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes: [".:/app"]
+    environment: { DATABASE_URL: "postgresql://stock:stock@postgres:5432/stock" }
+    command: sh -c "pip install -q ./libs/python && python db/init_db.py --seed"
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+
+  registry-primary:
+    build: { context: ., dockerfile: registry/Dockerfile }
+    environment: { <<: *env, ALLOW_LOCAL_URLS: "true" }
+    ports: ["8000:8000"]
+    depends_on: { redis: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+    restart: unless-stopped
+
+  registry-backup:
+    build: { context: ., dockerfile: registry/Dockerfile }
+    environment: { <<: *env, ALLOW_LOCAL_URLS: "true" }
+    ports: ["8001:8000"]
+    depends_on: { redis: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+    restart: unless-stopped
+
+  ui:
+    build: { context: ., dockerfile: ui/Dockerfile }
+    environment: { AMQP_URL: "amqp://guest:guest@rabbitmq:5672/", REGISTRY_URLS: "http://registry-primary:8000,http://registry-backup:8000" }
+    ports: ["8080:8080"]
+    depends_on: [registry-primary]
+    restart: unless-stopped
+
+  price-history:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: price_history } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8101", SERVICE_HEALTH_URL: "http://price-history:8000" }
+    ports: ["8101:8000"]
+
+  performance:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: performance } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8102", SERVICE_HEALTH_URL: "http://performance:8000" }
+    ports: ["8102:8000"]
+
+  volatility-risk:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: volatility_risk } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8103", SERVICE_HEALTH_URL: "http://volatility-risk:8000" }
+    ports: ["8103:8000"]
+
+  indicators:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: indicators } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8104", SERVICE_HEALTH_URL: "http://indicators:8000" }
+    ports: ["8104:8000"]
+
+  fund-builder:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: fund_builder } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8105", SERVICE_HEALTH_URL: "http://fund-builder:8000" }
+    ports: ["8105:8000"]
+
+  portfolio:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: portfolio } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8106", SERVICE_HEALTH_URL: "http://portfolio:8000" }
+    ports: ["8106:8000"]
+
+  correlation:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: correlation_svc } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8107", SERVICE_HEALTH_URL: "http://correlation:8000" }
+    ports: ["8107:8000"]
+
+  alerts-monitor:
+    <<: *service
+    build: { context: ., dockerfile: services/Dockerfile, args: { SERVICE: alerts_monitor } }
+    environment: { <<: *env, SERVICE_URL: "http://localhost:8108", SERVICE_HEALTH_URL: "http://alerts-monitor:8000" }
+    ports: ["8108:8000"]
+
+  # Run on demand:  docker compose run --rm ingestor
+  ingestor:
+    profiles: [tools]
+    build: { context: ., dockerfile: ingestor/Dockerfile }
+    environment: { <<: *env, DATA_SOURCE: "${DATA_SOURCE:-fake}", ALPHAVANTAGE_KEY: "${ALPHAVANTAGE_KEY:-demo}", ARCHIVE_DIR: /archive }
+    volumes: [archive:/archive]
+    depends_on: { init: { condition: service_completed_successfully }, rabbitmq: { condition: service_healthy } }
+
+volumes:
+  pgdata: {}
+  archive: {}
