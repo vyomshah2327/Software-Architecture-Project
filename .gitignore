@@ -15,3 +15,4 @@ build/
 *.egg-info/
 archive/
 .run/
+dump.rdb
