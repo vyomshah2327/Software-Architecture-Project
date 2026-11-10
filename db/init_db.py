@@ -10,6 +10,7 @@ import pathlib
 from datetime import date, timedelta
 
 import psycopg
+from psycopg import sql
 
 from stockplatform import fakedata
 from stockplatform.config import env
@@ -39,6 +40,12 @@ def main() -> None:
         conn.execute((HERE / "schema.sql").read_text())
         if args.roles:
             conn.execute((HERE / "roles.sql").read_text())
+            # Passwords come from the deployment: ROLE_PASSWORD_SVC_READER and so on.
+            for role in ("svc_reader", "svc_s6", "svc_s8", "ingestor"):
+                password = env(f"ROLE_PASSWORD_{role.upper()}")
+                if password:
+                    conn.execute(sql.SQL("ALTER ROLE {} PASSWORD {}").format(sql.Identifier(role), sql.Literal(password)))
+                    print(f"password set for {role}")
         if args.seed:
             end = date.today()
             start = end - timedelta(days=args.days)
