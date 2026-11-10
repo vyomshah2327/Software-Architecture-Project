@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: stock, POSTGRES_PASSWORD: stock, POSTGRES_DB: stock }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U stock" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://stock:stock@localhost:5432/stock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install
+        run: |
+          pip install -e "libs/python[test]" -e registry -e ingestor -e services pytest pytest-asyncio
+      - name: Create schema and sample data
+        run: python db/init_db.py --seed --roles
+      - name: Shared library tests
+        run: python -m pytest libs/python -q
+      - name: Registry tests
+        run: python -m pytest registry -q
+      - name: Ingestor tests
+        run: python -m pytest ingestor -q
+      - name: Service tests
+        run: python -m pytest services -q
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: ui }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: ui/package-lock.json }
+      - run: npm ci
+      - run: npm test
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Static reference check
+        run: pip install python-hcl2 && python scripts/check_terraform.py
+      - name: Format
+        run: terraform -chdir=infra/terraform fmt -check -diff
+        continue-on-error: true
+      - name: Validate
+        run: |
+          terraform -chdir=infra/terraform init -backend=false -input=false
+          terraform -chdir=infra/terraform validate
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose file is valid
+        run: docker compose config -q
