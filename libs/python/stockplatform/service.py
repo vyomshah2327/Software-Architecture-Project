@@ -40,6 +40,12 @@ pre{background:#f0f0f4;padding:10px;border-radius:6px;overflow:auto}
 """
 
 
+def code_engine_url() -> str:
+    """On IBM Cloud Code Engine every app gets CE_APP and CE_DOMAIN, which give its public address."""
+    app, domain = env("CE_APP"), env("CE_DOMAIN")
+    return f"https://{app}.{domain}" if app and domain else ""
+
+
 def render_page(title: str, body: str, script: str = "") -> HTMLResponse:
     """Wrap a tool's body HTML in the shared page layout."""
     t = html.escape(title)
@@ -64,7 +70,7 @@ def create_service(name: str, title: str, description: str, tags: list[str] | No
     """
     broker = broker if broker is not None else make_broker()
     if registry is None:
-        public_url = env("SERVICE_URL")
+        public_url = env("SERVICE_URL") or code_engine_url()
         urls = env_list("REGISTRY_URLS")
         registry = RegistryClient(urls, env("REGISTRY_KEY", ""), name, public_url or "",
                                   description, tags,

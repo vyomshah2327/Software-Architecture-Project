@@ -48,3 +48,12 @@ def test_no_registration_without_env(monkeypatch):
     monkeypatch.delenv("SERVICE_URL", raising=False)
     app = create_service("demo", "Demo", "A demo", broker=InMemoryBroker())
     assert app.state.registry is None
+
+
+def test_code_engine_url_is_built_from_its_variables(monkeypatch):
+    from stockplatform.service import code_engine_url
+    monkeypatch.setenv("CE_APP", "price-history")
+    monkeypatch.setenv("CE_DOMAIN", "abc123.us-south.codeengine.appdomain.cloud")
+    assert code_engine_url() == "https://price-history.abc123.us-south.codeengine.appdomain.cloud"
+    monkeypatch.delenv("CE_DOMAIN")
+    assert code_engine_url() == ""
