@@ -29,5 +29,5 @@ def test_latest(make_client):
 
 def test_page_health_and_instance_header(make_client):
     c = make_client(create_app)
-    assert "Price history" in c.get("/").text
+    assert "Price History" in c.get("/").text
     assert c.get("/health").headers["x-instance-id"]

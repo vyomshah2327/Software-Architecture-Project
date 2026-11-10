@@ -9,19 +9,24 @@ from stockplatform.service import create_service, render_page
 BENCHMARK = "SPY"
 
 PAGE = """
-<div class='card'><h2>Volatility and risk</h2>
-<label>Symbol</label><input id='sym' value='AAPL'>
-<label>Trading days</label><input id='days' type='number' value='252' min='30' max='2000'>
-<button onclick='go()'>Measure</button></div>
-<div class='card'><table id='t'></table><p class='err' id='e'></p></div>
+<div class='card'><div class='controls'>
+ <div><label>Symbol</label><input id='sym' value='AAPL' size='8'></div>
+ <div><label>Window</label><select id='days'><option value='63'>3 months</option><option value='126'>6 months</option><option value='252' selected>1 year</option><option value='504'>2 years</option></select></div>
+ <button onclick='go()'>Measure risk</button></div><p class='err' id='e'></p></div>
+<div id='level'></div>
+<div class='stats' id='stats'></div>
+<div class='card'><h3>How to read these</h3><p class='muted'><b>Volatility</b> is how much the price swings in a year. <b>Max drawdown</b> is the worst fall from a peak.
+ <b>Value at risk</b> is the loss that was exceeded on only 5 in 100 days. <b>Beta</b> compares moves with the market: above 1 swings more than SPY.
+ <b>Sharpe</b> is return per unit of risk.</p></div>
 """
 SCRIPT = """
-async function go(){const r=await fetch(`/api/risk/${document.getElementById('sym').value}?days=${document.getElementById('days').value}`);
- const j=await r.json();if(!r.ok){document.getElementById('e').textContent=j.detail;return}document.getElementById('e').textContent='';
- const pc=x=>(x*100).toFixed(2)+'%';
- document.getElementById('t').innerHTML=`<tr><th>Annual volatility</th><td>${pc(j.volatility)}</td></tr>
- <tr><th>Max drawdown</th><td>${pc(j.max_drawdown)}</td></tr><tr><th>1 day VaR (95%)</th><td>${pc(j.var_95)}</td></tr>
- <tr><th>Beta vs ${j.benchmark}</th><td>${j.beta.toFixed(2)}</td></tr><tr><th>Sharpe ratio</th><td>${j.sharpe.toFixed(2)}</td></tr>`;}
+async function go(){const r=await fetch(`/api/risk/${$('#sym').value.trim()}?days=${$('#days').value}`),j=await r.json();
+ if(!r.ok){setError(typeof j.detail==='string'?j.detail:'Check the symbol and window');return}setError();
+ const v=j.volatility,lvl=v<.2?['Low','green']:v<.35?['Moderate','purple']:['High','red'];
+ $('#level').innerHTML=`<div class="card" style="display:flex;align-items:center;gap:14px"><h2 style="margin:0">${j.symbol}</h2><span class="badge ${lvl[1]}">${lvl[0]} risk</span><span class="muted">based on ${j.days} trading days</span></div>`;
+ $('#stats').innerHTML=stat('Annual volatility',pct(v),'how bumpy the ride was')+stat('Max drawdown',pct(j.max_drawdown),'worst peak to trough fall','bad')
+  +stat('1 day value at risk',pct(j.var_95),'on 95 of 100 days losses were smaller')+stat('Beta vs '+j.benchmark,fmt(j.beta),j.beta>1?'swings more than the market':'swings less than the market')
+  +stat('Sharpe ratio',fmt(j.sharpe),'return per unit of risk',tone(j.sharpe))}
 go();
 """
 
@@ -35,7 +40,7 @@ def create_app(**kwargs):
 
     @app.get("/", include_in_schema=False)
     def page():
-        return render_page("Volatility and Risk", PAGE, SCRIPT)
+        return render_page("Volatility and Risk", PAGE, SCRIPT, "How risky is a company")
 
     @app.get("/api/risk/{symbol}")
     def risk(symbol: str, days: int = Query(default=252, ge=30, le=2000)):

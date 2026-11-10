@@ -11,20 +11,25 @@ from stockplatform.service import create_service, render_page
 PERIODS = {"1m": 21, "3m": 63, "6m": 126, "1y": 252, "max": 5000}
 
 PAGE = """
-<div class='card'><h2>Performance</h2>
-<label>Symbols (comma separated)</label><input id='syms' value='AAPL,MSFT,SPY' size='30'>
-<label>Period</label><select id='per'><option>1m</option><option>3m</option><option>6m</option>
-<option selected>1y</option><option>ytd</option><option>max</option></select>
-<button onclick='go()'>Compare</button></div>
-<div class='card'><table id='t'></table><p class='err' id='e'></p></div>
+<div class='card'><div class='controls'>
+ <div><label>Symbols, comma separated</label><input id='syms' value='AAPL,MSFT,JPM,XOM,SPY' size='34'></div>
+ <div><label>Period</label><select id='per'><option value='1m'>1 month</option><option value='3m'>3 months</option><option value='6m'>6 months</option>
+  <option value='1y' selected>1 year</option><option value='ytd'>Year to date</option><option value='max'>All history</option></select></div>
+ <button onclick='go()'>Compare</button></div><p class='err' id='e'></p></div>
+<div class='stats' id='stats'></div>
+<div class='card'><h3>Total return</h3><div id='bars'></div></div>
+<div class='card'><h3>Details</h3><table><thead><tr><th>Symbol</th><th>From</th><th>To</th><th class='num'>Total</th><th class='num'>Annualised</th>
+ <th class='num'>Best day</th><th class='num'>Worst day</th></tr></thead><tbody id='t'></tbody></table></div>
 """
 SCRIPT = """
-async function go(){const s=document.getElementById('syms').value,p=document.getElementById('per').value;
- const r=await fetch(`/api/compare?symbols=${s}&period=${p}`);const j=await r.json();
- if(!r.ok){document.getElementById('e').textContent=j.detail;return}document.getElementById('e').textContent='';
- const pc=x=>(x*100).toFixed(2)+'%';
- document.getElementById('t').innerHTML='<tr><th>Symbol</th><th>Total return</th><th>Annualised</th><th>Best day</th><th>Worst day</th></tr>'+
- j.results.map(x=>`<tr><td>${x.symbol}</td><td>${pc(x.total_return)}</td><td>${pc(x.annualized_return)}</td><td>${pc(x.best_day)}</td><td>${pc(x.worst_day)}</td></tr>`).join('');}
+async function go(){const r=await fetch(`/api/compare?symbols=${$('#syms').value}&period=${$('#per').value}`),j=await r.json();
+ if(!r.ok){setError(typeof j.detail==='string'?j.detail:'Check the symbols and try again');return}setError();
+ const res=[...j.results].sort((a,b)=>b.total_return-a.total_return),best=res[0],worst=res[res.length-1];
+ $('#stats').innerHTML=stat('Best performer',best.symbol,signed(best.total_return),'good')+stat('Weakest performer',worst.symbol,signed(worst.total_return),tone(worst.total_return))
+  +stat('Spread',pct(best.total_return-worst.total_return),'between best and weakest');
+ barChart($('#bars'),res.map(x=>x.symbol),res.map(x=>x.total_return),{format:v=>signed(v)});
+ $('#t').innerHTML=res.map(x=>`<tr><td><b>${x.symbol}</b></td><td>${x.start}</td><td>${x.end}</td><td class="num ${tone(x.total_return)}">${signed(x.total_return)}</td>
+  <td class="num ${tone(x.annualized_return)}">${signed(x.annualized_return)}</td><td class="num good">${signed(x.best_day)}</td><td class="num bad">${signed(x.worst_day)}</td></tr>`).join('')}
 go();
 """
 
@@ -65,7 +70,7 @@ def create_app(**kwargs):
 
     @app.get("/", include_in_schema=False)
     def page():
-        return render_page("Performance", PAGE, SCRIPT)
+        return render_page("Performance", PAGE, SCRIPT, "Compare returns over any period")
 
     @app.get("/api/performance/{symbol}")
     def performance(symbol: str, period: str = "1y"):

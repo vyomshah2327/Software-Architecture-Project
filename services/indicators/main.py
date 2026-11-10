@@ -9,22 +9,29 @@ from stockplatform.service import create_service, render_page
 NAMES = ("sma", "ema", "rsi", "macd")
 
 PAGE = """
-<div class='card'><h2>Technical indicators</h2>
-<label>Symbol</label><input id='sym' value='AAPL'>
-<label>Indicator</label><select id='ind'><option>sma</option><option>ema</option><option>rsi</option><option>macd</option></select>
-<label>Window</label><input id='win' type='number' value='20' min='2' max='200'>
-<button onclick='go()'>Calculate</button></div>
-<div class='card'><svg id='c' width='100%' height='160' viewBox='0 0 600 160' preserveAspectRatio='none'></svg>
-<p class='err' id='e'></p><pre id='o'></pre></div>
+<div class='card'><div class='controls'>
+ <div><label>Symbol</label><input id='sym' value='AAPL' size='8'></div>
+ <div><label>Indicator</label><select id='ind' onchange='sync()'><option value='sma'>Simple moving average</option><option value='ema'>Exponential moving average</option>
+  <option value='rsi'>RSI</option><option value='macd'>MACD</option></select></div>
+ <div id='wbox'><label>Window</label><input id='win' type='number' value='20' min='2' max='200' style='width:90px'></div>
+ <button onclick='go()'>Calculate</button></div><p class='err' id='e'></p></div>
+<div class='stats' id='stats'></div>
+<div class='card'><h3 id='ct'>Price</h3><div id='chart'></div></div>
 """
 SCRIPT = """
-async function go(){const i=document.getElementById('ind').value;
- const r=await fetch(`/api/indicators/${document.getElementById('sym').value}?name=${i}&window=${document.getElementById('win').value}&limit=120`);
- const j=await r.json();if(!r.ok){document.getElementById('e').textContent=j.detail;return}document.getElementById('e').textContent='';
- const s=(i==='macd'?j.macd:j.values).filter(x=>x!==null),mn=Math.min(...s),mx=Math.max(...s);
- document.getElementById('c').innerHTML='<polyline fill="none" stroke="#4f2683" stroke-width="2" points="'+
- s.map((v,k)=>`${k*600/Math.max(1,s.length-1)},${150-(v-mn)/(mx-mn||1)*140}`).join(' ')+'"/>';
- document.getElementById('o').textContent='Latest: '+JSON.stringify(j.latest);}
+function sync(){const i=$('#ind').value;$('#wbox').style.display=i==='macd'?'none':'';$('#win').value=i==='rsi'?14:20}
+async function go(){loading($('#chart'));const i=$('#ind').value;
+ const r=await fetch(`/api/indicators/${$('#sym').value.trim()}?name=${i}&window=${$('#win').value}&limit=120`),j=await r.json();
+ if(!r.ok){setError(typeof j.detail==='string'?j.detail:'Check the inputs');return}setError();const d=j.dates.map(x=>x.slice(5));
+ if(i==='sma'||i==='ema'){const last=j.close[j.close.length-1],v=j.latest,up=last>v;
+  $('#stats').innerHTML=stat('Last close',fmt(last))+stat(i.toUpperCase()+' '+j.window,fmt(v))+stat('Price vs average',signed(last/v-1),up?'trading above the average':'trading below the average',tone(last/v-1));
+  $('#ct').textContent='Close and '+i.toUpperCase()+' '+j.window;lineChart($('#chart'),d,[{name:'Close',values:j.close},{name:i.toUpperCase()+' '+j.window,values:j.values,color:'#f59e0b'}])}
+ else if(i==='rsi'){const v=j.latest,s=v>70?['Overbought','red']:v<30?['Oversold','green']:['Neutral','purple'];
+  $('#stats').innerHTML=stat('RSI '+j.window,fmt(v,1),'0 to 100 scale')+`<div class="stat"><div class="k">Reading</div><div class="v"><span class="badge ${s[1]}">${s[0]}</span></div><div class="s">above 70 or below 30 is notable</div></div>`;
+  $('#ct').textContent='Relative strength index';lineChart($('#chart'),d,[{name:'RSI',values:j.values,color:'#7c3aed'}],{min:0,max:100,bands:[{y:70,label:'70'},{y:30,label:'30'}],format:v=>fmt(v,0)})}
+ else{const l=j.latest,bull=l.macd>l.signal;
+  $('#stats').innerHTML=stat('MACD line',fmt(l.macd,3))+stat('Signal line',fmt(l.signal,3))+`<div class="stat"><div class="k">Momentum</div><div class="v"><span class="badge ${bull?'green':'red'}">${bull?'Bullish':'Bearish'}</span></div><div class="s">MACD ${bull?'above':'below'} signal</div></div>`;
+  $('#ct').textContent='MACD and signal';lineChart($('#chart'),d,[{name:'MACD',values:j.macd},{name:'Signal',values:j.signal,color:'#f59e0b'}],{format:v=>fmt(v,2)})}}
 go();
 """
 
@@ -38,7 +45,7 @@ def create_app(**kwargs):
 
     @app.get("/", include_in_schema=False)
     def page():
-        return render_page("Technical Indicators", PAGE, SCRIPT)
+        return render_page("Technical Indicators", PAGE, SCRIPT, "Moving averages, RSI and MACD")
 
     @app.get("/api/indicators/{symbol}")
     def indicators(symbol: str, name: str = "sma", window: int = Query(default=20, ge=2, le=200),
