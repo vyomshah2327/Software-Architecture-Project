@@ -78,7 +78,7 @@ function lineChart(el,labels,series,opts={}){
   const uid='g'+Math.random().toString(36).slice(2,7);let g='',defs='';
   for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4,yy=y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="${css('--line')}" stroke-width="1"/><text x="${L-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="${css('--muted')}">${fmtY(v)}</text>`}
   const ticks=Math.min(5,n);for(let k=0;k<ticks;k++){const i=Math.round(k*(n-1)/Math.max(1,ticks-1));g+=`<text x="${x(i)}" y="${H-8}" text-anchor="${k==0?'start':k==ticks-1?'end':'middle'}" font-size="11" fill="${css('--muted')}">${labels[i]}</text>`}
-  (opts.bands||[]).forEach(b=>{g+=`<line x1="${L}" x2="${W-R}" y1="${y(b.y)}" y2="${y(b.y)}" stroke="#d97706" stroke-dasharray="4 4"/><text x="${W-R}" y="${y(b.y)-4}" text-anchor="end" font-size="11" fill="#d97706">${b.label||''}</text>`)});
+  (opts.bands||[]).forEach(b=>{g+=`<line x1="${L}" x2="${W-R}" y1="${y(b.y)}" y2="${y(b.y)}" stroke="#d97706" stroke-dasharray="4 4"/><text x="${W-R}" y="${y(b.y)-4}" text-anchor="end" font-size="11" fill="#d97706">${b.label||''}</text>`});
   series.forEach((s,si)=>{const c=s.color||COLORS[si%COLORS.length];let d='',pen=false,first=-1,last=-1;
     s.values.forEach((v,i)=>{if(v==null||!isFinite(v)){pen=false;return}d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);pen=true;if(first<0)first=i;last=i});
     if(s.area!==false&&si===0&&opts.area!==false&&first>=0){defs+=`<linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".30"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient>`;
