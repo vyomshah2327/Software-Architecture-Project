@@ -8,25 +8,34 @@ from stockplatform.prices import symbol_exists
 from stockplatform.service import create_service, render_page
 
 PAGE = """
-<div class='card'><h2>My portfolio</h2><label>User</label><input id='u' value='demo'>
-<label>Symbol</label><input id='s' value='AAPL' size='8'><label>Quantity</label><input id='q' type='number' value='10'>
-<label>Average cost</label><input id='c' type='number' value='150'>
-<button onclick='add()'>Add holding</button> <button onclick='watch()'>Watch symbol</button></div>
-<div class='card'><table id='t'></table><p id='tot'></p><p class='err' id='e'></p></div>
+<div class='card'><div class='controls'>
+ <div><label>User</label><input id='u' value='demo' style='width:100px' onchange='load()'></div>
+ <div><label>Symbol</label><input id='s' value='AAPL' size='7'></div>
+ <div><label>Quantity</label><input id='q' type='number' value='10' style='width:90px'></div>
+ <div><label>Average cost</label><input id='c' type='number' value='150' style='width:110px'></div>
+ <button onclick='add()'>Add holding</button><button class='ghost' onclick='watch()'>Add to watchlist</button></div><p class='err' id='e'></p></div>
+<div class='stats' id='stats'></div>
+<div class='card'><h3>Allocation</h3><div id='alloc'></div></div>
+<div class='card'><h3>Holdings</h3><table><thead><tr><th>Symbol</th><th class='num'>Quantity</th><th class='num'>Avg cost</th><th class='num'>Last</th>
+ <th class='num'>Value</th><th class='num'>Profit and loss</th><th class='num'>Weight</th><th></th></tr></thead><tbody id='t'></tbody></table></div>
 <div class='card'><h3>Watchlist</h3><div id='w'></div></div>
 """
 SCRIPT = """
-const U=()=>document.getElementById('u').value,E=m=>document.getElementById('e').textContent=m||'';
-async function post(url,body,method='POST'){const r=await fetch(url,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
- if(!r.ok){E((await r.json()).detail);return false}E();return true}
-async function add(){if(await post('/api/holdings',{user_id:U(),symbol:s.value,quantity:+q.value,avg_cost:+c.value}))load()}
-async function watch(){if(await post(`/api/watchlist/${s.value}?user_id=${U()}`,null,'PUT'))load()}
-async function drop(sym){await post(`/api/holdings/${sym}?user_id=${U()}`,null,'DELETE');load()}
-async function load(){const j=await (await fetch(`/api/portfolio?user_id=${U()}`)).json();const pc=x=>(x*100).toFixed(2)+'%';
- t.innerHTML='<tr><th>Symbol</th><th>Qty</th><th>Avg cost</th><th>Last</th><th>Value</th><th>P&L</th><th>Weight</th><th></th></tr>'+
- j.positions.map(p=>`<tr><td>${p.symbol}</td><td>${p.quantity}</td><td>${p.avg_cost}</td><td>${p.last_price}</td><td>${p.value.toFixed(2)}</td><td>${p.pnl.toFixed(2)} (${pc(p.pnl_pct)})</td><td>${pc(p.weight)}</td><td><button onclick="drop('${p.symbol}')">Remove</button></td></tr>`).join('');
- tot.textContent=`Total value ${j.total_value.toFixed(2)}, profit and loss ${j.total_pnl.toFixed(2)}`;
- w.textContent=(await (await fetch(`/api/watchlist?user_id=${U()}`)).json()).symbols.join(', ')||'Nothing watched yet';}
+const U=()=>$('#u').value.trim()||'demo';
+async function call(url,method,body){const r=await fetch(url,{method,headers:{'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
+ if(!r.ok){const j=await r.json();setError(typeof j.detail==='string'?j.detail:'Check the values and try again');return false}setError();return true}
+async function add(){if(await call('/api/holdings','POST',{user_id:U(),symbol:$('#s').value,quantity:+$('#q').value,avg_cost:+$('#c').value}))load()}
+async function watch(){if(await call(`/api/watchlist/${$('#s').value}?user_id=${U()}`,'PUT'))load()}
+async function drop(s){await call(`/api/holdings/${s}?user_id=${U()}`,'DELETE');load()}
+async function unwatch(s){await call(`/api/watchlist/${s}?user_id=${U()}`,'DELETE');load()}
+async function load(){const j=await (await fetch(`/api/portfolio?user_id=${U()}`)).json(),cost=j.positions.reduce((a,p)=>a+p.quantity*p.avg_cost,0);
+ $('#stats').innerHTML=stat('Total value',fmt(j.total_value),j.positions.length+' positions')+stat('Profit and loss',(j.total_pnl>=0?'+':'')+fmt(j.total_pnl),cost?signed(j.total_pnl/cost)+' on cost':'',tone(j.total_pnl))+stat('Invested',fmt(cost));
+ donut($('#alloc'),j.positions.map(p=>({label:p.symbol,value:p.value})));
+ $('#t').innerHTML=j.positions.length?j.positions.map(p=>`<tr><td><b>${p.symbol}</b></td><td class="num">${p.quantity}</td><td class="num">${fmt(p.avg_cost)}</td><td class="num">${fmt(p.last_price)}</td>
+  <td class="num">${fmt(p.value)}</td><td class="num ${tone(p.pnl)}">${p.pnl>=0?'+':''}${fmt(p.pnl)} (${signed(p.pnl_pct)})</td><td class="num">${pct(p.weight,1)}</td>
+  <td><button class="ghost" onclick="drop('${p.symbol}')">Remove</button></td></tr>`).join(''):'<tr><td colspan="8" class="empty">No holdings yet. Add one above.</td></tr>';
+ const w=(await (await fetch(`/api/watchlist?user_id=${U()}`)).json()).symbols;
+ $('#w').innerHTML=w.length?w.map(s=>`<span class="badge purple" style="margin:0 8px 8px 0;font-size:14px;padding:5px 12px">${s} <a href="#" style="color:inherit;text-decoration:none" onclick="unwatch('${s}');return false">&times;</a></span>`).join(''):'<span class="muted">Nothing watched yet.</span>'}
 load();
 """
 
@@ -45,7 +54,7 @@ def create_app(**kwargs):
 
     @app.get("/", include_in_schema=False)
     def page():
-        return render_page("Portfolio", PAGE, SCRIPT)
+        return render_page("Portfolio", PAGE, SCRIPT, "Holdings, watchlist and profit and loss")
 
     @app.post("/api/holdings", status_code=201)
     def add_holding(h: Holding):

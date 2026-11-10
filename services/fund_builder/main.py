@@ -8,25 +8,30 @@ from stockplatform.prices import load_aligned, symbol_exists
 from stockplatform.service import create_service, render_page
 
 PAGE = """
-<div class='card'><h2>Fund builder</h2>
-<label>Symbols with optional weights, for example AAPL:50,MSFT:30,JNJ:20</label>
-<input id='basket' value='AAPL:50,MSFT:30,JNJ:20' size='40'>
-<label>Amount</label><input id='amt' type='number' value='10000'>
-<label>Trading days</label><input id='days' type='number' value='252'>
-<button onclick='go()'>Back-test</button></div>
-<div class='card'><svg id='c' width='100%' height='160' viewBox='0 0 600 160' preserveAspectRatio='none'></svg>
-<table id='t'></table><p class='err' id='e'></p></div>
+<div class='card'><div class='controls'>
+ <div><label>Basket, symbol:weight</label><input id='basket' value='AAPL:40,MSFT:30,JNJ:20,XOM:10' size='38'></div>
+ <div><label>Amount</label><input id='amt' type='number' value='10000' style='width:110px'></div>
+ <div><label>History</label><select id='days'><option value='125'>6 months</option><option value='252' selected>1 year</option><option value='500'>2 years</option></select></div>
+ <button onclick='go()'>Back-test</button></div>
+ <div class='controls' style='margin-top:12px'><div><label>Or get an idea from a sector</label><select id='sector'></select></div>
+ <button class='ghost' onclick='suggest()'>Suggest a basket</button></div><p class='err' id='e'></p></div>
+<div class='stats' id='stats'></div>
+<div class='card'><h3>Value of the fund over time</h3><div id='chart'></div></div>
+<div class='card'><h3>Allocation</h3><div id='alloc'></div></div>
 """
 SCRIPT = """
-async function go(){const w={};document.getElementById('basket').value.split(',').forEach(p=>{const [s,x]=p.trim().split(':');if(s)w[s.toUpperCase()]=x?parseFloat(x):1});
- const r=await fetch('/api/backtest',{method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify({symbols:Object.keys(w),weights:w,amount:+document.getElementById('amt').value,days:+document.getElementById('days').value})});
- const j=await r.json();if(!r.ok){document.getElementById('e').textContent=JSON.stringify(j.detail);return}document.getElementById('e').textContent='';
- const v=j.values,mn=Math.min(...v),mx=Math.max(...v),pc=x=>(x*100).toFixed(2)+'%';
- document.getElementById('c').innerHTML='<polyline fill="none" stroke="#4f2683" stroke-width="2" points="'+v.map((y,i)=>`${i*600/Math.max(1,v.length-1)},${150-(y-mn)/(mx-mn||1)*140}`).join(' ')+'"/>';
- document.getElementById('t').innerHTML=`<tr><th>Final value</th><td>${j.final_value.toFixed(2)}</td></tr><tr><th>Total return</th><td>${pc(j.total_return)}</td></tr>
- <tr><th>Volatility</th><td>${pc(j.volatility)}</td></tr><tr><th>Max drawdown</th><td>${pc(j.max_drawdown)}</td></tr>`;}
-go();
+async function sectors(){const s=await (await fetch('/api/sectors')).json();$('#sector').innerHTML=s.map(x=>`<option>${x}</option>`).join('')}
+async function suggest(){const r=await fetch('/api/suggest?count=4&sector='+encodeURIComponent($('#sector').value)),j=await r.json();
+ if(!r.ok){setError(j.detail);return}$('#basket').value=j.symbols.map(s=>s+':'+Math.round(j.weights[s]*100)).join(',');go()}
+async function go(){loading($('#chart'));const w={};$('#basket').value.split(',').forEach(p=>{const [s,x]=p.trim().split(':');if(s)w[s.toUpperCase()]=x?parseFloat(x):1});
+ const r=await fetch('/api/backtest',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({symbols:Object.keys(w),weights:w,amount:+$('#amt').value,days:+$('#days').value})});
+ const j=await r.json();if(!r.ok){setError(typeof j.detail==='string'?j.detail:'Check the basket: each symbol once, weights not negative');$('#chart').innerHTML='';return}setError();
+ const amt=+$('#amt').value;
+ $('#stats').innerHTML=stat('Final value',fmt(j.final_value),'started with '+fmt(amt,0))+stat('Total return',signed(j.total_return),'',tone(j.total_return))
+  +stat('Volatility',pct(j.volatility),'annualised')+stat('Max drawdown',pct(j.max_drawdown),'worst fall from a peak','bad');
+ lineChart($('#chart'),j.dates.map(d=>d.slice(5)),[{name:'Fund value',values:j.values}]);
+ donut($('#alloc'),Object.entries(j.weights).map(([k,v])=>({label:k,value:v})))}
+sectors().then(go);
 """
 
 
@@ -46,7 +51,7 @@ def create_app(**kwargs):
 
     @app.get("/", include_in_schema=False)
     def page():
-        return render_page("Fund Builder", PAGE, SCRIPT)
+        return render_page("Fund Builder", PAGE, SCRIPT, "Back-test a basket of companies")
 
     @app.post("/api/backtest")
     def backtest(b: Basket):
