@@ -1,0 +1,63 @@
+name: Deploy
+
+# Manual. Deploys the images tagged with the chosen tag to IBM Cloud Code Engine with Terraform.
+# Repository secrets needed:
+#   IBMCLOUD_API_KEY
+#   TF_STATE_BUCKET, TF_STATE_ENDPOINT, TF_STATE_ACCESS_KEY, TF_STATE_SECRET_KEY   (an Object Storage bucket for Terraform state)
+#   GHCR_TOKEN   (only if the images are private; a token with read:packages)
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to deploy
+        default: latest
+      max_instances:
+        description: Most copies of each service (1 turns scaling off)
+        default: "5"
+      data_source:
+        description: fake or alphavantage
+        default: fake
+
+concurrency: deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_ibmcloud_api_key: ${{ secrets.IBMCLOUD_API_KEY }}
+      TF_VAR_image_prefix: ghcr.io/${{ github.repository_owner }}
+      TF_VAR_image_tag: ${{ inputs.image_tag }}
+      TF_VAR_max_instances: ${{ inputs.max_instances }}
+      TF_VAR_data_source: ${{ inputs.data_source }}
+      TF_VAR_image_registry_username: ${{ secrets.GHCR_TOKEN && github.repository_owner || '' }}
+      TF_VAR_image_registry_password: ${{ secrets.GHCR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_wrapper: false }
+      - name: Keep Terraform state in Object Storage
+        run: |
+          cat > infra/terraform/backend_override.tf <<EOF
+          terraform {
+            backend "s3" {
+              bucket                      = "${{ secrets.TF_STATE_BUCKET }}"
+              key                         = "stock/terraform.tfstate"
+              region                      = "us-south"
+              endpoints                   = { s3 = "${{ secrets.TF_STATE_ENDPOINT }}" }
+              access_key                  = "${{ secrets.TF_STATE_ACCESS_KEY }}"
+              secret_key                  = "${{ secrets.TF_STATE_SECRET_KEY }}"
+              skip_credentials_validation = true
+              skip_region_validation      = true
+              skip_requesting_account_id  = true
+              skip_metadata_api_check     = true
+              skip_s3_checksum            = true
+              use_path_style              = true
+            }
+          }
+          EOF
+      - name: Install IBM Cloud CLI
+        run: |
+          curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+          ibmcloud plugin install code-engine -f
+      - name: Deploy
+        run: scripts/deploy.sh
