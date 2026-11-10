@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from stockplatform import metrics as metrics_module
-from stockplatform.config import env, env_bool, env_list
+from stockplatform.config import env, env_bool, env_float, env_list
 from stockplatform.events import Broker, SERVICE_EXPIRED, SERVICE_REGISTERED, make_broker
 from stockplatform.service import INSTANCE_ID, render_page
 
@@ -44,12 +44,39 @@ class Registration(BaseModel):
     health_url: str | None = None
 
 
+_client = httpx.Client(timeout=1.0, follow_redirects=False,
+                       limits=httpx.Limits(max_connections=50, max_keepalive_connections=20))
+
+
 def http_health_check(url: str) -> bool:
     """A service is healthy if GET {url}/health answers 200 within 1 second."""
     try:
-        return httpx.get(url.rstrip("/") + "/health", timeout=1.0, follow_redirects=False).status_code == 200
+        return _client.get(url.rstrip("/") + "/health").status_code == 200
     except httpx.HTTPError:
         return False
+
+
+class CachedHealth:
+    """Remembers each health answer for a few seconds so a burst of searches does not turn into a
+    burst of health checks. A service that dies stays listed for at most this long."""
+
+    def __init__(self, check: Callable[[str], bool], ttl: float):
+        self.check, self.ttl = check, ttl
+        self._seen: dict[str, tuple[float, bool]] = {}
+        self._lock = threading.Lock()
+
+    def __call__(self, url: str) -> bool:
+        now = time.monotonic()
+        if self.ttl > 0:
+            with self._lock:
+                hit = self._seen.get(url)
+            if hit and now - hit[0] < self.ttl:
+                return hit[1]
+        result = self.check(url)
+        if self.ttl > 0:
+            with self._lock:
+                self._seen[url] = (now, result)
+        return result
 
 
 def validate_url(url: str, allowed_domains: list[str], allow_local: bool) -> str | None:
@@ -71,12 +98,14 @@ def validate_url(url: str, allowed_domains: list[str], allow_local: bool) -> str
 def create_app(redis_client, broker: Broker | None = None, key: str | None = None,
                allowed_domains: list[str] | None = None, allow_local: bool | None = None,
                health_check: Callable[[str], bool] = http_health_check,
-               sweep_seconds: float = 5.0, start_sweeper: bool = True) -> FastAPI:
+               sweep_seconds: float = 5.0, start_sweeper: bool = True,
+               health_ttl: float | None = None) -> FastAPI:
     key = key if key is not None else env("REGISTRY_KEY", "")
     allowed_domains = allowed_domains if allowed_domains is not None else \
         [d.lower() for d in env_list("ALLOWED_DOMAINS")]
     allow_local = allow_local if allow_local is not None else env_bool("ALLOW_LOCAL_URLS", False)
     broker = broker if broker is not None else make_broker()
+    health_check = CachedHealth(health_check, env_float("HEALTH_CACHE_SECONDS", 5.0) if health_ttl is None else health_ttl)
     stop = threading.Event()
 
     # ------------------------------------------------------------------ helpers

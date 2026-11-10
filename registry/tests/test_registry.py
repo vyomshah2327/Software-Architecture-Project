@@ -139,3 +139,29 @@ def test_bad_health_url_is_rejected(parts):
     client = parts[0]
     r = client.post("/services", json={**SVC, "health_url": "http://localhost:1"}, headers=KEY)
     assert r.status_code == 422
+
+
+def test_health_results_are_cached_for_the_ttl():
+    checks = []
+    app = create_app(fakeredis.FakeRedis(), InMemoryBroker(), key="secret", allowed_domains=["example.com"],
+                     health_check=lambda u: checks.append(u) or True, start_sweeper=False, health_ttl=0.2)
+    client = TestClient(app)
+    client.post("/services", json=SVC, headers=KEY)
+    for _ in range(5):
+        assert len(client.get("/services").json()["services"]) == 1
+    assert len(checks) == 1  # five searches, one health check
+    time.sleep(0.25)
+    client.get("/services")
+    assert len(checks) == 2
+
+
+def test_a_service_that_goes_down_disappears_after_the_cache_expires():
+    state = {"up": True}
+    app = create_app(fakeredis.FakeRedis(), InMemoryBroker(), key="secret", allowed_domains=["example.com"],
+                     health_check=lambda u: state["up"], start_sweeper=False, health_ttl=0.1)
+    client = TestClient(app)
+    client.post("/services", json=SVC, headers=KEY)
+    assert len(client.get("/services").json()["services"]) == 1
+    state["up"] = False
+    time.sleep(0.15)
+    assert client.get("/services").json()["services"] == []
