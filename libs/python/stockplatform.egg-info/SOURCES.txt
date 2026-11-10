@@ -1,0 +1,11 @@
+pyproject.toml
+stockplatform/__init__.py
+stockplatform/config.py
+stockplatform/db.py
+stockplatform/fakedata.py
+stockplatform.egg-info/PKG-INFO
+stockplatform.egg-info/SOURCES.txt
+stockplatform.egg-info/dependency_links.txt
+stockplatform.egg-info/requires.txt
+stockplatform.egg-info/top_level.txt
+tests/test_fakedata.py
