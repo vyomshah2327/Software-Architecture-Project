@@ -13,7 +13,7 @@ function listenForAlerts(url, onAlert, log = console) {
   async function connect() {
     if (stopped) return;
     try {
-      connection = await amqp.connect(url);
+      connection = await amqp.connect(url, process.env.AMQP_TLS_VERIFY === 'false' ? { rejectUnauthorized: false } : {});
       const ch = await connection.createChannel();
       await ch.assertExchange('platform.events', 'topic', { durable: true });
       const q = await ch.assertQueue('ui.alerts', { durable: true });

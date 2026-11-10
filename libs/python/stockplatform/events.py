@@ -23,6 +23,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Callable
 
+from .config import env_bool
+
 log = logging.getLogger("events")
 
 EXCHANGE = "platform.events"
@@ -169,6 +171,13 @@ class AmqpBroker(Broker):
         import pika  # imported here so tests that do not need RabbitMQ stay light
         self._pika = pika
         self._params = pika.URLParameters(url)
+        if url.startswith("amqps://") and not env_bool("AMQP_TLS_VERIFY", True):
+            # Managed brokers often use a private CA. Only turn verification off for a demo.
+            import ssl
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            self._params.ssl_options = pika.SSLOptions(context)
         self._params.socket_timeout = 3
         self._params.blocked_connection_timeout = 3
         self._reconnect_delay = reconnect_delay

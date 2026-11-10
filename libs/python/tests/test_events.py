@@ -139,3 +139,10 @@ def test_amqp_malformed_message_is_dead_lettered():
     broker, ch = amqp_for_tests(), FakeChannel()
     broker.handle_delivery(ch, Method(7), Props(), b"not json", "q", lambda e: None, SeenIds())
     assert ch.nacked == [(7, False)]
+
+
+def test_amqps_tls_verification_can_be_turned_off(monkeypatch):
+    import ssl
+    monkeypatch.setenv("AMQP_TLS_VERIFY", "false")
+    broker = AmqpBroker("amqps://u:p@127.0.0.1:1/")
+    assert broker._params.ssl_options.context.verify_mode == ssl.CERT_NONE
