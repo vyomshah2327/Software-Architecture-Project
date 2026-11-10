@@ -5,62 +5,139 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Stock Analytics Platform</title>
 <style>
-  body{font-family:system-ui,sans-serif;margin:0;background:#f5f6f8;color:#1b1f24}
-  header{background:#4f2683;color:#fff;padding:16px 24px}
-  header h1{margin:0;font-size:20px}
-  #banner{display:none;background:#f5a623;color:#3b2a00;padding:10px 24px;font-weight:600}
-  #banner.down{background:#b00020;color:#fff}
-  main{max-width:960px;margin:24px auto;padding:0 16px}
-  form{display:flex;gap:8px;margin-bottom:16px}
-  input{flex:1;font:inherit;padding:10px 12px;border:1px solid #bbb;border-radius:6px}
-  button{font:inherit;padding:10px 18px;border:0;border-radius:6px;background:#4f2683;color:#fff;cursor:pointer}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-  .card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px #0002}
-  .card h3{margin:0 0 6px}.card a{color:#4f2683;font-weight:600}
-  .tag{display:inline-block;background:#ece6f4;color:#4f2683;border-radius:10px;padding:1px 8px;margin:4px 4px 0 0;font-size:12px}
-  .muted{color:#666}
-  #toast{position:fixed;right:16px;bottom:16px;max-width:320px}
-  .toast{background:#1b1f24;color:#fff;padding:12px 14px;border-radius:8px;margin-top:8px}
-  .badge{font-size:12px;margin-left:12px;opacity:.85}
+:root{--bg:#f4f1fa;--card:#fff;--ink:#1c1530;--muted:#6b6385;--line:#e8e3f3;--brand:#5b21b6;--brand2:#7c3aed;--good:#10b981;--bad:#ef4444;--warn:#f59e0b;
+--shadow:0 1px 2px #1c15300d,0 10px 30px #1c153012}
+@media (prefers-color-scheme:dark){:root{--bg:#120e1f;--card:#1b1530;--ink:#f1edfb;--muted:#a79fc4;--line:#2d2548;--brand:#a78bfa;--shadow:0 1px 2px #0006,0 10px 30px #0005}}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.hero{background:linear-gradient(125deg,#2e0a73,#5b21b6 50%,#7c3aed);color:#fff;padding:34px 24px 92px;position:relative;overflow:hidden}
+.hero:before,.hero:after{content:"";position:absolute;border-radius:50%;background:#ffffff12}
+.hero:before{width:420px;height:420px;right:-120px;top:-180px}.hero:after{width:260px;height:260px;left:-80px;bottom:-140px}
+.wrap{max-width:1080px;margin:0 auto;position:relative;z-index:1}
+nav{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:12px;background:#ffffff26;display:grid;place-items:center;font-size:21px}
+nav b{font-size:17px;letter-spacing:-.2px}
+.pill{margin-left:auto;display:flex;align-items:center;gap:8px;background:#ffffff1f;border:1px solid #ffffff33;padding:7px 14px;border-radius:30px;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#94a3b8}.dot.primary{background:#34d399;box-shadow:0 0 0 4px #34d39933}
+.dot.backup{background:#fbbf24;box-shadow:0 0 0 4px #fbbf2433}.dot.down{background:#f87171;box-shadow:0 0 0 4px #f8717133}
+h1{font-size:clamp(28px,5vw,44px);margin:34px 0 8px;letter-spacing:-1px;line-height:1.1}
+.sub{opacity:.88;font-size:17px;max-width:640px;margin:0 0 26px}
+form{display:flex;gap:10px;max-width:680px;background:#fff;padding:7px;border-radius:16px;box-shadow:0 14px 40px #1c153040}
+form svg{margin:0 4px 0 12px;align-self:center;flex:none}
+input{flex:1;font:inherit;font-size:16px;border:0;outline:0;padding:11px 6px;color:#1c1530;background:transparent;min-width:0}
+button{font:inherit;font-weight:700;border:0;border-radius:11px;padding:0 24px;color:#fff;cursor:pointer;background:linear-gradient(120deg,#5b21b6,#7c3aed)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{background:#ffffff1f;border:1px solid #ffffff3a;color:#fff;border-radius:20px;padding:5px 14px;font-size:13px;cursor:pointer}
+.chip:hover{background:#ffffff33}
+#banner{display:none;background:#f59e0b;color:#3b2a00;padding:11px 24px;font-weight:600;text-align:center}
+#banner.down{background:#dc2626;color:#fff}
+main{max-width:1080px;margin:-58px auto 40px;padding:0 24px;position:relative;z-index:2}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px}
+.kpi{background:var(--card);border-radius:16px;padding:16px 20px;box-shadow:var(--shadow);border:1px solid var(--line)}
+.kpi .k{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}.kpi .v{font-size:28px;font-weight:800;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--muted)}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.tool{background:var(--card);border-radius:18px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--line);text-decoration:none;color:inherit;display:block;
+transition:transform .15s,box-shadow .15s;animation:in .4s both}
+.tool:hover{transform:translateY(-4px);box-shadow:0 18px 40px #7c3aed26}
+@keyframes in{from{opacity:0;transform:translateY(10px)}}
+.icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;color:#fff;margin-bottom:14px}
+.tool h3{margin:0 0 6px;font-size:17px}.tool p{margin:0 0 12px;color:var(--muted);font-size:14px;line-height:1.45;min-height:40px}
+.tag{display:inline-block;background:#7c3aed1a;color:var(--brand);border-radius:12px;padding:2px 9px;margin:0 5px 5px 0;font-size:12px;font-weight:600}
+.open{display:block;margin-top:8px;color:var(--brand);font-weight:700;font-size:14px}
+.empty{text-align:center;color:var(--muted);padding:50px 10px;grid-column:1/-1}
+.arch{background:var(--card);border-radius:18px;padding:22px;box-shadow:var(--shadow);border:1px solid var(--line);margin-top:30px}
+.flow{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
+.node{border:2px solid var(--line);border-radius:14px;padding:10px 16px;text-align:center;min-width:130px;font-size:14px}
+.node small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.node.on{border-color:var(--good);background:#10b98114}.node.standby{opacity:.7}.node.off{border-color:var(--bad);background:#ef444414}
+.node.warn{border-color:var(--warn);background:#f59e0b14}
+.arrow{color:var(--muted);font-size:20px}
+.stack{display:flex;flex-direction:column;gap:8px}
+.explain{color:var(--muted);font-size:13px;text-align:center;max-width:720px;margin:0 auto}
+#toast{position:fixed;right:18px;bottom:18px;max-width:340px;z-index:9}
+.toast{background:#1c1530;color:#fff;padding:14px 16px;border-radius:14px;margin-top:10px;box-shadow:0 12px 30px #0006;border-left:5px solid #ef4444;animation:in .3s both}
+.toast b{display:block;margin-bottom:2px}
+@media(max-width:700px){.row{grid-template-columns:1fr}.pill{display:none}}
 </style>
 </head>
 <body>
-<header><h1>Stock Analytics Platform <span class="badge" id="role"></span></h1></header>
+<div class="hero"><div class="wrap">
+  <nav><div class="logo">&#128200;</div><b>Stock Analytics Platform</b>
+    <div class="pill" title="Which service registry is answering"><span class="dot" id="dot"></span><span id="role">connecting</span></div></nav>
+  <h1>Find the right tool<br>for your next decision</h1>
+  <p class="sub">Eight analysis services, discovered live from a service registry. Search by what you want to do.</p>
+  <form id="f"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input id="q" placeholder="Try risk, correlation, portfolio or alerts" autofocus autocomplete="off"><button>Search</button></form>
+  <div class="chips" id="chips"></div>
+</div></div>
 <div id="banner" role="status"></div>
 <main>
-  <form id="f"><input id="q" placeholder="Search tools, for example risk, correlation or portfolio" autofocus><button>Search</button></form>
-  <p class="muted" id="count"></p>
+  <div class="row">
+    <div class="kpi"><div class="k">Tools online</div><div class="v" id="k1">0</div><div class="s">registered and passing health checks</div></div>
+    <div class="kpi"><div class="k">Registry</div><div class="v" id="k2">...</div><div class="s" id="k2s">checking</div></div>
+    <div class="kpi"><div class="k">Last update</div><div class="v" id="k3">...</div><div class="s">the list refreshes by itself</div></div>
+  </div>
+  <h2 id="count">Tools</h2>
   <div class="grid" id="results"></div>
+  <div class="arch">
+    <h2>What is happening behind this page</h2>
+    <div class="flow">
+      <div class="node">Your browser<small>this page</small></div><span class="arrow">&rarr;</span>
+      <div class="stack"><div class="node on" id="nPrimary">Registry primary<small id="sPrimary">active</small></div><div class="node standby" id="nBackup">Registry backup<small id="sBackup">standby</small></div></div>
+      <span class="arrow">&rarr;</span>
+      <div class="node" id="nTools">Tool services<small id="sTools">0 online</small></div>
+    </div>
+    <p class="explain">Each search goes to the registry, which only lists tools that answer a health check. If the primary does not answer within 2 seconds the page asks the backup, so search keeps working.</p>
+  </div>
 </main>
 <div id="toast"></div>
 <script>
 const $=id=>document.getElementById(id);
-function show(services){
-  $('count').textContent=services.length?`${services.length} tool${services.length>1?'s':''} available`:'No tools match your search.';
-  $('results').innerHTML=services.map(s=>`<div class="card"><h3><a href="${s.url}" target="_blank" rel="noopener">${esc(s.name)}</a></h3>
-    <div class="muted">${esc(s.description)}</div>${(s.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`).join('');
+const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LOOK={ 'price-history':['&#128202;','Price History','#7c3aed,#a78bfa'],'performance':['&#128640;','Performance','#0ea5e9,#38bdf8'],
+ 'volatility-risk':['&#9889;','Volatility and Risk','#f59e0b,#fbbf24'],'indicators':['&#128201;','Technical Indicators','#10b981,#34d399'],
+ 'fund-builder':['&#129521;','Fund Builder','#ec4899,#f472b6'],'portfolio':['&#128188;','Portfolio','#6366f1,#818cf8'],
+ 'correlation':['&#128256;','Correlation','#14b8a6,#2dd4bf'],'alerts-monitor':['&#128276;','Alerts and Monitor','#ef4444,#f87171'] };
+const CHIPS=['risk','price','portfolio','correlation','alerts','indicators'];
+$('chips').innerHTML=CHIPS.map(c=>`<span class="chip" data-q="${c}">${c}</span>`).join('');
+$('chips').addEventListener('click',e=>{if(e.target.dataset.q!==undefined){$('q').value=e.target.dataset.q;search()}});
+let total=0;
+function card(s,i){const l=LOOK[s.name]||['&#129513;',s.name,'#64748b,#94a3b8'];
+  return `<a class="tool" style="animation-delay:${i*40}ms" href="${esc(s.url)}" target="_blank" rel="noopener">
+   <div class="icon" style="background:linear-gradient(135deg,${l[2]})">${l[0]}</div><h3>${esc(l[1])}</h3><p>${esc(s.description)}</p>
+   ${(s.tags||[]).slice(0,4).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}<span class="open">Open tool &rarr;</span></a>`}
+function show(list,q){
+  $('count').textContent=q?`${list.length} result${list.length==1?'':'s'} for "${q}"`:'All tools';
+  $('results').innerHTML=list.length?list.map(card).join(''):'<div class="empty">No tools match that search. Try another word.</div>';
+  $('sTools').textContent=(q?total:list.length)+' online';
 }
-function esc(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function banner(role){
-  const b=$('banner'); b.className=role==='down'?'down':'';
-  if(role==='primary'){b.style.display='none';$('role').textContent='registry: primary';return}
-  b.style.display='block';
-  b.textContent=role==='backup'?'Running on the backup registry. Everything still works.':'The service registry is not reachable. Search is paused.';
-  $('role').textContent='registry: '+role;
+function status(role,degraded){
+  const dot=$('dot'),b=$('banner');dot.className='dot '+role;
+  $('role').textContent=role==='primary'?'Primary registry':role==='backup'?'Backup registry':role==='down'?'Registry unreachable':'connecting';
+  $('k2').textContent=role==='primary'?'Primary':role==='backup'?'Backup':'Down';
+  $('k2s').textContent=role==='primary'?'all systems normal':role==='backup'?'primary is not answering':'search is paused';
+  $('nPrimary').className='node '+(role==='primary'?'on':role==='backup'?'off':'off');$('sPrimary').textContent=role==='primary'?'active':'not answering';
+  $('nBackup').className='node '+(role==='backup'?'warn':'standby');$('sBackup').textContent=role==='backup'?'serving requests':'standby';
+  b.className=role==='down'?'down':'';
+  if(role==='primary'){b.style.display='none'}
+  else{b.style.display='block';b.textContent=role==='backup'?'Running on the backup registry. Everything still works.':'The service registry is not reachable. Search is paused.'}
 }
 async function search(){
-  const q=$('q').value;
-  try{const r=await fetch('/api/search?q='+encodeURIComponent(q));const j=await r.json();
-    if(!r.ok){banner('down');$('count').textContent=j.error;$('results').innerHTML='';return}
-    banner(j.role);show(j.services)}
-  catch(e){banner('down')}
+  const q=$('q').value.trim();
+  try{const r=await fetch('/api/search?q='+encodeURIComponent(q)),j=await r.json();
+    if(!r.ok){status('down');$('results').innerHTML=`<div class="empty">${esc(j.error)}</div>`;return}
+    if(!q){total=j.services.length;$('k1').textContent=total}
+    status(j.role);show(j.services,q);$('k3').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+  catch(e){status('down')}
 }
 $('f').addEventListener('submit',e=>{e.preventDefault();search()});
 const es=new EventSource('/api/events');
-es.addEventListener('registry',e=>banner(JSON.parse(e.data).role));
+es.addEventListener('registry',e=>status(JSON.parse(e.data).role));
 es.addEventListener('services',()=>search());
-es.addEventListener('alert',e=>{const a=JSON.parse(e.data);const t=document.createElement('div');t.className='toast';
-  t.textContent=`Alert: ${a.symbol} is ${a.direction} ${a.threshold} (now ${a.price})`;$('toast').appendChild(t);setTimeout(()=>t.remove(),15000)});
+es.addEventListener('alert',e=>{const a=JSON.parse(e.data),t=document.createElement('div');t.className='toast';
+  t.innerHTML=`<b>Price alert</b>${esc(a.symbol)} is ${esc(a.direction)} ${esc(a.threshold)} (now ${esc(a.price)})`;$('toast').appendChild(t);setTimeout(()=>t.remove(),15000)});
 search();
 </script>
 </body>
