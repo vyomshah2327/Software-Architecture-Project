@@ -1,0 +1,19 @@
+# Used by the compose stack:  docker compose --profile monitoring up
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: registry
+    static_configs:
+      - targets: [registry-primary:8000, registry-backup:8000]
+  - job_name: services
+    static_configs:
+      - targets:
+          - price-history:8000
+          - performance:8000
+          - volatility-risk:8000
+          - indicators:8000
+          - fund-builder:8000
+          - portfolio:8000
+          - correlation:8000
+          - alerts-monitor:8000
