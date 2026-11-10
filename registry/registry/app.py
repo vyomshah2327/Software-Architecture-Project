@@ -23,6 +23,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from stockplatform import metrics as metrics_module
 from stockplatform.config import env, env_bool, env_list
 from stockplatform.events import Broker, SERVICE_EXPIRED, SERVICE_REGISTERED, make_broker
 from stockplatform.service import INSTANCE_ID, render_page
@@ -127,6 +128,7 @@ def create_app(redis_client, broker: Broker | None = None, key: str | None = Non
     app = FastAPI(title="Service Registry", description="Registers stock services and lets the UI search them.",
                   lifespan=lifespan)
     app.state.sweep_once = sweep_once
+    metrics_module.install(app, "registry", INSTANCE_ID)
 
     @app.middleware("http")
     async def instance_header(request, call_next):

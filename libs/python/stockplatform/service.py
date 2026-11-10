@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 
 from .config import env, env_list
+from . import metrics as metrics_module
 from .events import Broker, Handler, make_broker
 from .registry_client import RegistryClient
 
@@ -95,6 +96,7 @@ def create_service(name: str, title: str, description: str, tags: list[str] | No
 
     app = FastAPI(title=title, description=description, lifespan=lifespan)
     app.state.name = name
+    metrics_module.install(app, name, INSTANCE_ID)
     app.state.broker = broker
     app.state.registry = registry
 
