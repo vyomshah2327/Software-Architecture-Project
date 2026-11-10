@@ -122,3 +122,20 @@ def test_health_reports_redis_down():
             raise ConnectionError("down")
     app = create_app(Broken(), InMemoryBroker(), key="secret", start_sweeper=False)
     assert TestClient(app).get("/health").status_code == 503
+
+
+def test_health_check_uses_health_url_when_given():
+    checked = []
+    app = create_app(fakeredis.FakeRedis(), InMemoryBroker(), key="secret", allowed_domains=["example.com"],
+                     allow_local=True, health_check=lambda u: checked.append(u) or True, start_sweeper=False)
+    client = TestClient(app)
+    client.post("/services", json={**SVC, "health_url": "http://price-history:8000"}, headers=KEY)
+    body = client.get("/services").json()["services"]
+    assert checked == ["http://price-history:8000"] and body[0]["url"] == "https://s1.example.com"
+    assert "health_url" not in body[0]
+
+
+def test_bad_health_url_is_rejected(parts):
+    client = parts[0]
+    r = client.post("/services", json={**SVC, "health_url": "http://localhost:1"}, headers=KEY)
+    assert r.status_code == 422

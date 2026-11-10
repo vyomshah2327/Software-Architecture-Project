@@ -26,11 +26,14 @@ REQUEST_TIMEOUT = 2.0
 class RegistryClient:
     def __init__(self, registry_urls: list[str], key: str, name: str, url: str,
                  description: str = "", tags: list[str] | None = None,
+                 health_url: str | None = None,
                  heartbeat_seconds: float = HEARTBEAT_SECONDS,
                  transport: httpx.BaseTransport | None = None):
         self.registry_urls = [u.rstrip("/") for u in registry_urls if u]
         self.name = name
         self.payload = {"name": name, "url": url, "description": description, "tags": tags or []}
+        if health_url:  # where the registry checks health, when that differs from the public url
+            self.payload["health_url"] = health_url
         self.heartbeat_seconds = heartbeat_seconds
         self._http = httpx.Client(timeout=REQUEST_TIMEOUT, transport=transport,
                                   headers={"X-Registry-Key": key})

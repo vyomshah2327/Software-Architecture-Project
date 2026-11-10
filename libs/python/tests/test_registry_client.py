@@ -82,3 +82,12 @@ def test_no_registry_urls_means_no_thread():
     c = RegistryClient([], "k", "n", "https://x")
     c.start()
     assert c._thread is None
+
+
+def test_health_url_is_sent_only_when_set():
+    sent = []
+    handler = lambda req: sent.append(req.content) or httpx.Response(201)
+    RegistryClient(["http://r"], "k", "n", "https://x", health_url="http://n:8000",
+                   transport=httpx.MockTransport(handler)).register()
+    RegistryClient(["http://r"], "k", "n", "https://x", transport=httpx.MockTransport(handler)).register()
+    assert b"health_url" in sent[0] and b"health_url" not in sent[1]

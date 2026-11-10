@@ -40,6 +40,7 @@ class Registration(BaseModel):
     url: str
     description: str = Field(default="", max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=10)
+    health_url: str | None = None
 
 
 def http_health_check(url: str) -> bool:
@@ -148,6 +149,10 @@ def create_app(redis_client, broker: Broker | None = None, key: str | None = Non
         problem = validate_url(reg.url, allowed_domains, allow_local)
         if problem:
             raise HTTPException(422, problem)
+        if reg.health_url:
+            problem = validate_url(reg.health_url, allowed_domains, allow_local)
+            if problem:
+                raise HTTPException(422, "health_url: " + problem)
         is_new = not redis_client.exists(lease_key(reg.name))
         record = {**reg.model_dump(), "registered_at": time.time()}
         redis_client.set(lease_key(reg.name), json.dumps(record), ex=LEASE_SECONDS)
@@ -177,7 +182,7 @@ def create_app(redis_client, broker: Broker | None = None, key: str | None = Non
         if not found:
             return {"query": q, "services": []}
         with ThreadPoolExecutor(max_workers=min(8, len(found))) as pool:
-            healthy = list(pool.map(lambda r: health_check(r["url"]), found))
+            healthy = list(pool.map(lambda r: health_check(r.get("health_url") or r["url"]), found))
         return {"query": q, "services": [
             {k: r[k] for k in ("name", "url", "description", "tags")}
             for r, ok in zip(found, healthy) if ok]}

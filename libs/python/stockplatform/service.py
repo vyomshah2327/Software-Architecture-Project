@@ -67,7 +67,8 @@ def create_service(name: str, title: str, description: str, tags: list[str] | No
         public_url = env("SERVICE_URL")
         urls = env_list("REGISTRY_URLS")
         registry = RegistryClient(urls, env("REGISTRY_KEY", ""), name, public_url or "",
-                                  description, tags) if public_url and urls else None
+                                  description, tags,
+                                  health_url=env("SERVICE_HEALTH_URL") or None) if public_url and urls else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
