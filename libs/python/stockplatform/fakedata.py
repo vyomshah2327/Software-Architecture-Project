@@ -60,8 +60,8 @@ def business_days(start: date, end: date) -> list[date]:
 
 def _series(symbol: str, end: date) -> list[dict]:
     rng = random.Random(zlib.crc32(symbol.encode()))
-    start_price = 40 + rng.random() * 360
-    drift = 0.0002 + rng.random() * 0.0006
+    start_price = 30 + rng.random() * 220
+    drift = 0.00005 + rng.random() * 0.00025
     vol = 0.008 if symbol == INDEX_SYMBOL else 0.010 + rng.random() * 0.015
     price = start_price
     rows = []
