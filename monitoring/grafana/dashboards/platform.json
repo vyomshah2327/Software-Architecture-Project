@@ -153,7 +153,7 @@
       },
       "targets": [
         {
-          "expr": "count by (service) (http_requests_in_flight)",
+          "expr": "count by (service) (max_over_time(http_requests_in_flight[1m]))",
           "legendFormat": "{{service}}",
           "refId": "A"
         }
