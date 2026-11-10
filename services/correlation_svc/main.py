@@ -7,18 +7,24 @@ from stockplatform.prices import load_aligned, symbol_exists
 from stockplatform.service import create_service, render_page
 
 PAGE = """
-<div class='card'><h2>Correlation</h2>
-<label>Symbols (comma separated, 2 to 12)</label><input id='syms' value='AAPL,MSFT,XOM,JPM,SPY' size='40'>
-<label>Trading days</label><input id='days' type='number' value='252' min='30' max='2000'>
-<button onclick='go()'>Calculate</button></div>
-<div class='card'><table id='t'></table><p class='err' id='e'></p></div>
+<div class='card'><div class='controls'>
+ <div><label>Symbols, 2 to 12</label><input id='syms' value='AAPL,MSFT,NVDA,JPM,XOM,JNJ,SPY' size='42'></div>
+ <div><label>Window</label><select id='days'><option value='63'>3 months</option><option value='126'>6 months</option><option value='252' selected>1 year</option></select></div>
+ <button onclick='go()'>Calculate</button></div><p class='err' id='e'></p></div>
+<div class='stats' id='stats'></div>
+<div class='card'><h3>Correlation of daily returns</h3><div style='overflow:auto'><table id='t' style='text-align:center'></table></div>
+ <div class='legend' style='align-items:center;margin-top:14px'>-1 <span style='display:inline-block;width:220px;height:10px;border-radius:6px;background:linear-gradient(90deg,#f97316,#fff7ed 50%,#ede9fe 50%,#6d28d9)'></span> +1
+ <span>Close to +1: move together. Close to -1: move opposite. Near 0: unrelated.</span></div></div>
 """
 SCRIPT = """
-async function go(){const r=await fetch(`/api/correlation?symbols=${document.getElementById('syms').value}&days=${document.getElementById('days').value}`);
- const j=await r.json();if(!r.ok){document.getElementById('e').textContent=j.detail;return}document.getElementById('e').textContent='';
- const n=Object.keys(j.matrix),col=v=>`rgba(79,38,131,${Math.abs(v).toFixed(2)})`;
- document.getElementById('t').innerHTML='<tr><th></th>'+n.map(x=>`<th>${x}</th>`).join('')+'</tr>'+
- n.map(a=>`<tr><th>${a}</th>`+n.map(b=>`<td style="background:${col(j.matrix[a][b])};color:${Math.abs(j.matrix[a][b])>.5?'#fff':'#000'}">${j.matrix[a][b].toFixed(2)}</td>`).join('')+'</tr>').join('');}
+function color(v){const a=Math.min(1,Math.abs(v));return v>=0?`rgba(109,40,217,${a.toFixed(2)})`:`rgba(249,115,22,${a.toFixed(2)})`}
+async function go(){const r=await fetch(`/api/correlation?symbols=${$('#syms').value}&days=${$('#days').value}`),j=await r.json();
+ if(!r.ok){setError(typeof j.detail==='string'?j.detail:'Give 2 to 12 different symbols');return}setError();
+ const n=Object.keys(j.matrix),pairs=[];n.forEach((a,i)=>n.forEach((b,k)=>{if(k>i)pairs.push([a,b,j.matrix[a][b]])}));pairs.sort((x,y)=>y[2]-x[2]);
+ const hi=pairs[0],lo=pairs[pairs.length-1];
+ $('#stats').innerHTML=stat('Most alike',hi[0]+' and '+hi[1],'correlation '+fmt(hi[2]))+stat('Least alike',lo[0]+' and '+lo[1],'correlation '+fmt(lo[2]))+stat('Window',j.days+' days','of daily returns');
+ $('#t').innerHTML='<tr><th></th>'+n.map(x=>`<th style="text-align:center">${x}</th>`).join('')+'</tr>'+
+  n.map(a=>`<tr><th>${a}</th>`+n.map(b=>{const v=j.matrix[a][b];return `<td style="background:${color(v)};color:${Math.abs(v)>.5?'#fff':'inherit'};font-weight:600;border-radius:6px">${v.toFixed(2)}</td>`}).join('')+'</tr>').join('')}
 go();
 """
 
@@ -32,7 +38,7 @@ def create_app(**kwargs):
 
     @app.get("/", include_in_schema=False)
     def page():
-        return render_page("Correlation", PAGE, SCRIPT)
+        return render_page("Correlation", PAGE, SCRIPT, "How closely companies move together")
 
     @app.get("/api/correlation")
     def correlation(symbols: str = Query(min_length=1), days: int = Query(default=252, ge=30, le=2000)):
